@@ -1,16 +1,33 @@
-<!doctype html>
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <!-- Enable responsiveness on mobile devices-->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
 
-<html lang="en">
-
-<head>
-  <meta charset="utf-8">
 
   <title>Classy Password Generator</title>
   <meta name="description" content="Classy password generator">
   <meta name="author" content="hjfreyer">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-
   <style>
+  :root {
+  /* -moz-osx-font-smoothing: auto; // Macs no longer do subpixel AA at all */
+  /* -webkit-font-smoothing: subpixel-antialiased; // Ditto */
+  font-size: 16px;
+  /* -moz-osx--text-size-adjust: 100%; // Not a real prefix / property */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  /* font-smooth: auto; // This is an anti-pattern */
+}
+
+::-moz-selection,
+::selection{
+    background: hsla(1, 0%, 75%, 0.4);
+    text-shadow: none;
+}
+
+
     @media only screen and (max-width : 480px) {
       #passwords .remember::before, #passwords .type::before {
         display: block;
@@ -315,7 +332,9 @@
   </footer>
 
   <script>
-    (function() {
+    // biome-ignore lint/complexity/useArrowFunction: <explanation>
+      (function() {
+      // biome-ignore lint/style/noVar: <explanation>
       var WORDLIST = [
         'abandon',
         'ability',
@@ -2367,45 +2386,63 @@
         'zoo',
       ];
 
-      function cryptoRandomB2048() {
+      function CryptoRandomGenerator(crypto) {
+        this.crypto = crypto;
+      }
+
+      CryptoRandomGenerator.prototype.cryptoRandomB2048 = function() {
         var random_bytes = new Uint8Array(2);
-        window.crypto.getRandomValues(random_bytes);
+        this.crypto.getRandomValues(random_bytes);
+        // biome-ignore lint/style/noVar: <explanation>
         var random_num = 256 * random_bytes[0] + random_bytes[1];
 
         // Constant time version of random_num % 2048. Note this only works for
         // powers of two!
         return random_num & 2047;
+      };
+
+      function PasswordGenerator(cryptoRandomGenerator) {
+        this.cryptoRandomGenerator = cryptoRandomGenerator;
       }
 
-      function bagOfWords(size) {
-        var words = [];
+      PasswordGenerator.prototype.bagOfWords = function(size) {
+        const words = [];
+        let word;
         while (words.length < size) {
-          var word = WORDLIST[cryptoRandomB2048()];
-          if (words.indexOf(word) == -1) {
+          word = WORDLIST[this.cryptoRandomGenerator.cryptoRandomB2048()];
+          if (words.indexOf(word) === -1) {
             words.push(word);
           }
         }
         return words;
+      };
+      PasswordGenerator.prototype.generatePassword = function() {
+        return this.bagOfWords(5);
+      };
+
+      function PasswordUI(passwordGenerator) {
+        this.passwordGenerator = passwordGenerator;
       }
 
-      function resetPasswords() {
-        var numPasswords = 16;
-        var container = document.getElementById('passwords');
+      PasswordUI.prototype.resetPasswords = function() {
+        const numPasswords = 16;
+        const container = document.getElementById('passwords');
+        container.innerHTML = ''; // Clear existing passwords
 
-        for (var passwordIdx = 0; passwordIdx < numPasswords; passwordIdx++) {
-          appendPasswordRow(container);
+        for (let passwordIdx = 0; passwordIdx < numPasswords; passwordIdx++) {
+          this.appendPasswordRow(container);
         }
-      }
-      window.resetPasswords = resetPasswords;
+      };
 
-      function appendPasswordRow(container) {
-        var words = bagOfWords(5);
+      PasswordUI.prototype.appendPasswordRow = function(container) {
+        var words = this.passwordGenerator.generatePassword();
 
         var youRemember = document.createElement('div');
         var youType = document.createElement('div');
         youRemember.className = 'remember';
         youType.className = 'type';
 
+        // biome-ignore lint/complexity/useArrowFunction: <explanation>
         words.forEach(function(word, idx) {
           var rememberSpan = document.createElement('span');
           rememberSpan.innerHTML = word;
@@ -2418,9 +2455,22 @@
 
         container.appendChild(youRemember);
         container.appendChild(youType);
-      }
+      };
 
-      resetPasswords();
+      // Initialization
+      var cryptoRandomGenerator = new CryptoRandomGenerator(window.crypto);
+      // biome-ignore lint/style/noVar: <explanation>
+      var passwordGenerator = new PasswordGenerator(cryptoRandomGenerator);
+      // biome-ignore lint/style/noVar: <explanation>
+      var passwordUI = new PasswordUI(passwordGenerator);
+
+      // Expose resetPasswords to the global scope
+      window.resetPasswords = function() {
+        passwordUI.resetPasswords();
+      };
+
+      // Initial password generation
+      passwordUI.resetPasswords();
     })();
   </script>
 </body>
